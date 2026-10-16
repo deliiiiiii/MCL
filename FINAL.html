@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mutant Type Lab</title>
+
+  <!-- p5.js & OpenType.js CDN libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/opentype.js@latest/dist/opentype.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #f5f5f5;
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(0, 0, 0, 0.15);
+      --glass-specular: rgba(255, 255, 255, 0.9);
+      --text-main: #000000;
+      --text-muted: #666666;
+      --control-bg: rgba(255, 255, 255, 0.7);
+      --control-border: #000000;
+      --btn-bg: transparent;
+      --btn-text: #000000;
+      --btn-hover-bg: #000000;
+      --btn-hover-text: #ffffff;
+      --slider-track: #cccccc;
+      --slider-thumb: #000000;
+      --card-bg: rgba(255, 255, 255, 0.45);
+      --card-border: rgba(0, 0, 0, 0.15);
+      --card-hover-border: #000000;
+      --card-hover-bg: rgba(0, 0, 0, 0.06);
+      --active-accent: #000000;
+      --shadow-ambient: 0 20px 40px rgba(0, 0, 0, 0.08);
+      --section-box-bg: rgba(0, 0, 0, 0.04);
+      --section-box-border: rgba(0, 0, 0, 0.12);
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #050505;
+      --glass-bg: rgba(18, 18, 18, 0.75);
+      --glass-border: rgba(255, 255, 255, 0.15);
+      --glass-specular: rgba(255, 255, 255, 0.25);
+      --text-main: #ffffff;
+      --text-muted: #888888;
+      --control-bg: rgba(255, 255, 255, 0.08);
+      --control-border: #ffffff;
+      --btn-bg: transparent;
+      --btn-text: #ffffff;
+      --btn-hover-bg: #ffffff;
+      --btn-hover-text: #000000;
+      --slider-track: #333333;
+      --slider-thumb: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --card-hover-border: #ffffff;
+      --card-hover-bg: rgba(255, 255, 255, 0.1);
+      --active-accent: #ffffff;
+      --shadow-ambient: 0 25px 50px rgba(0, 0, 0, 0.6);
+      --section-box-bg: rgba(255, 255, 255, 0.05);
+      --section-box-border: rgba(255, 255, 255, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      user-select: none;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+
+    .ambient-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.55;
+    }
+    .glow-1 {
+      top: -100px;
+      left: 100px;
+      width: 400px;
+      height: 400px;
+      background: rgba(130, 130, 130, 0.25);
+    }
+    .glow-2 {
+      bottom: -100px;
+      right: 150px;
+      width: 460px;
+      height: 460px;
+      background: rgba(150, 150, 150, 0.2);
+    }
+
+    .hazy-glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-ambient), inset 0 1px 0 var(--glass-specular);
+      border-radius: 14px;
+      transition: background 0.25s, border-color 0.25s, box-shadow 0.25s, height 0.25s ease;
+    }
+
+    #sidebar-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 320px;
+      max-height: calc(100vh - 40px);
+      padding: 16px;
+      overflow-y: auto;
+      z-index: 10;
+      scrollbar-width: thin;
+      scrollbar-color: var(--text-muted) transparent;
+    }
+
+    #specimen-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 380px;
+      height: calc(100vh - 40px);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    #sidebar-controls.minimized {
+      height: 52px;
+      overflow: hidden;
+    }
+    #sidebar-controls.minimized .panel-collapsible {
+      display: none;
+    }
+
+    #specimen-panel.minimized {
+      height: 52px;
+      overflow: hidden;
+    }
+    #specimen-panel.minimized #specimen-grid {
+      display: none;
+    }
+
+    .panel-nav-btn {
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .panel-nav-btn:hover {
+      background: var(--card-hover-bg);
+      border-color: var(--active-accent);
+    }
+
+    #sidebar-controls::-webkit-scrollbar,
+    #specimen-grid::-webkit-scrollbar {
+      width: 4px;
+    }
+    #sidebar-controls::-webkit-scrollbar-thumb,
+    #specimen-grid::-webkit-scrollbar-thumb {
+      background: var(--text-muted);
+      border-radius: 4px;
+    }
+
+    .panel-header {
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .panel-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    #specimen-grid {
+      flex: 1;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+      gap: 8px;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--text-muted) transparent;
+    }
+
+    .specimen-card {
+      aspect-ratio: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .specimen-card:hover {
+      border-color: var(--card-hover-border);
+      background: var(--card-hover-bg);
+      transform: translateY(-1px);
+    }
+
+    .specimen-card.selected-glyph {
+      border: 2px solid var(--active-accent);
+      background: var(--card-hover-bg);
+    }
+
+    .card-char {
+      font-size: 9px;
+      align-self: flex-start;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .card-preview {
+      width: 100%;
+      height: 38px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .ui-group {
+      margin-bottom: 14px;
+    }
+
+    .ui-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .ui-group span.val-badge {
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .highlighted-box {
+      background: var(--section-box-bg);
+      border: 1px solid var(--section-box-border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 14px;
+    }
+
+    #targetBadgeContainer {
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #targetBadgeText {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    input[type="text"], textarea, select, input[type="file"] {
+      width: 100%;
+      background: var(--control-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+
+    /* Multiline auto-expanding textarea */
+    textarea#textInput {
+      resize: vertical;
+      min-height: 58px;
+      line-height: 1.4;
+    }
+
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: var(--control-border);
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid var(--control-border);
+      width: 32px;
+      height: 26px;
+      border-radius: 5px;
+      cursor: pointer;
+      background: var(--control-bg);
+      padding: 1px;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--active-accent);
+      cursor: pointer;
+      width: 15px;
+      height: 15px;
+      margin: 0;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 3px;
+      background: var(--slider-track);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+      margin: 8px 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--slider-thumb);
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    .btn-mono {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--control-border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s, color 0.15s, transform 0.08s;
+    }
+
+    .btn-mono:hover {
+      background: var(--btn-hover-bg);
+      color: var(--btn-hover-text);
+    }
+
+    .btn-mono:active {
+      transform: scale(0.96);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 16px;
+    }
+
+    .row-flex {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #glyph-focus-window {
+      position: absolute;
+      top: 100px;
+      left: calc(50% - 210px);
+      width: 420px;
+      height: 480px;
+      z-index: 50;
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    #glyph-focus-window.active {
+      display: flex;
+    }
+
+    .window-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .window-header:active {
+      cursor: grabbing;
+    }
+
+    .window-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .window-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin: 10px 0;
+    }
+
+    #focusPreviewCanvas {
+      width: 290px;
+      height: 290px;
+    }
+
+    .focus-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: var(--control-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .focus-nav-btn:hover {
+      border-color: var(--active-accent);
+      background: var(--card-hover-bg);
+      transform: translateY(-50%) scale(1.08);
+    }
+
+    #focusPrevBtn { left: 4px; }
+    #focusNextBtn { right: 4px; }
+
+    .window-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--glass-border);
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <!-- Left Sidebar Controls -->
+  <aside id="sidebar-controls" class="hazy-glass">
+    <div class="panel-header" style="margin-bottom: 8px;">
+      <div class="row-flex">
+        <span class="panel-title">MUTANT TYPE LAB</span>
+        <button id="themeToggleBtn" class="btn-mono" style="padding: 2px 6px; font-size: 9px;">☀️ LIGHT</button>
+      </div>
+      <button id="toggleControlsBtn" class="panel-nav-btn" title="Minimize Controls">–</button>
+    </div>
+
+    <div class="panel-collapsible">
+      <!-- Multiline Text Input (Pressing Enter creates new lines) -->
+      <div class="ui-group" style="margin-top: 6px;">
+        <label>Input Text <span class="val-badge" style="font-size: 9px; opacity: 0.7;">Enter = New Line</span></label>
+        <textarea id="textInput" rows="2" placeholder="Type text and press enter for new lines...">MUTANT</textarea>
+      </div>
+
+      <!-- FILL & OUTLINE CONTROLS -->
+      <div class="highlighted-box">
+        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px; text-transform: uppercase;">
+          Fill & Outline Style
+        </div>
+        
+        <!-- Fill Enable & Color -->
+        <div class="row-flex" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label style="display: flex; align-items: center; gap: 6px; margin: 0; cursor: pointer;">
+            <input type="checkbox" id="fillCheckbox" checked />
+            <span style="font-size: 11px; font-weight: 600;">Enable Fill</span>
+          </label>
+          <input type="color" id="fillColorPicker" value="#ffffff" title="Fill Color" />
+        </div>
+
+        <!-- Fill Texture / Effect Mode -->
+        <div style="margin-bottom: 8px;">
+          <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 3px; font-weight: 600; text-transform: uppercase;">Fill Effect</div>
+          <select id="fillModePicker" style="padding: 5px 8px; font-size: 11px;">
+            <option value="solid" selected>Solid Fill</option>
+            <option value="dither">Dithering (Bayer Matrix)</option>
+            <option value="noise">Noise Variation</option>
+          </select>
+        </div>
+
+        <!-- Fill Effect Intensity Slider -->
+        <div id="fillEffectGroup" style="display: none; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">
+            <span id="fillEffectLabel">Dither Density</span>
+            <span id="fillEffectBadge" class="val-badge">50%</span>
+          </div>
+          <input type="range" id="fillEffectSlider" min="0" max="1" value="0.5" step="0.02" style="margin: 2px 0;" />
+        </div>
+
+        <!-- Stroke / Outline Controls -->
+        <div class="row-flex" style="justify-content: space-between; align-items: center; margin-bottom: 8px; padding-top: 4px; border-top: 1px solid var(--section-box-border);">
+          <label style="display: flex; align-items: center; gap: 6px; margin: 0; cursor: pointer;">
+            <input type="checkbox" id="strokeCheckbox" />
+            <span style="font-size: 11px; font-weight: 600;">Enable Outline</span>
+          </label>
+          <input type="color" id="strokeColorPicker" value="#000000" title="Outline Color" />
+        </div>
+
+        <!-- Outline Width -->
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">
+            <span>Outline Width</span>
+            <span id="strokeWeightBadge" class="val-badge">1px</span>
+          </div>
+          <input type="range" id="strokeWeightSlider" min="1" max="10" value="1" step="0.5" style="margin: 2px 0;" />
+        </div>
+      </div>
+
+      <!-- Target Mode Indicator -->
+      <div id="targetBadgeContainer">
+        <span id="targetBadgeText">TARGET: ALL GLYPHS</span>
+        <div class="row-flex" style="gap: 4px;">
+          <button id="btnOpenFocusWindow" class="btn-mono" style="padding: 3px 6px; font-size: 9px;">VIEW</button>
+          <button id="resetTargetBtn" class="btn-mono" style="padding: 3px 6px; font-size: 9px; display: none;">GLOBAL</button>
+        </div>
+      </div>
+
+      <!-- Active Font Upload -->
+      <div class="ui-group">
+        <label>Active Font <span id="fontBadge" class="val-badge">System Sans</span></label>
+        <input type="file" id="fontFilePicker" accept=".otf,.ttf,.woff" />
+      </div>
+
+      <!-- Shape & Composition -->
+      <div class="ui-group">
+        <label>Shape & Composite Mode</label>
+        <div class="row-flex">
+          <select id="shapePicker">
+            <option value="ellipse" selected>Ellipse</option>
+            <option value="square">Square</option>
+            <option value="image">Custom Icon</option>
+          </select>
+          <select id="blendPicker">
+            <option value="normal" selected>Normal</option>
+            <option value="overlap">Overlap</option>
+            <option value="exclude">Exclude (XOR)</option>
+          </select>
+        </div>
+        <div id="iconPickerWrapper" style="margin-top: 8px; display: none;">
+          <input type="file" id="iconFilePicker" accept="image/png,image/jpeg" />
+        </div>
+      </div>
+
+      <!-- Sliders -->
+      <div class="ui-group">
+        <label>Shape Width <span id="wBadge" class="val-badge">12</span></label>
+        <input type="range" id="wSlider" min="2" max="60" value="12" step="1" />
+      </div>
+
+      <div class="ui-group">
+        <label>Shape Height <span id="hBadge" class="val-badge">12</span></label>
+        <input type="range" id="hSlider" min="2" max="60" value="12" step="1" />
+      </div>
+
+      <div class="ui-group">
+        <label>Noise Jitter <span id="noiseBadge" class="val-badge">0</span></label>
+        <input type="range" id="noiseSlider" min="0" max="60" value="0" step="0.5" />
+      </div>
+
+      <div class="ui-group">
+        <label>Grid Density (Sample Step) <span id="gridBadge" class="val-badge">6</span></label>
+        <input type="range" id="gridSlider" min="2" max="20" value="6" step="1" />
+      </div>
+
+      <div class="ui-group">
+        <label>Overall Scale <span id="scaleBadge" class="val-badge">1.0</span></label>
+        <input type="range" id="scaleSlider" min="0.2" max="3" value="1.0" step="0.01" />
+      </div>
+
+      <div class="ui-group">
+        <label>Stretch X / Y</label>
+        <div class="row-flex">
+          <input type="range" id="stretchXSlider" min="0.2" max="3" value="1.0" step="0.01" />
+          <input type="range" id="stretchYSlider" min="0.2" max="3" value="1.0" step="0.01" />
+        </div>
+      </div>
+
+      <div class="ui-group">
+        <label>Rotation <span id="rotBadge" class="val-badge">0°</span></label>
+        <input type="range" id="rotSlider" min="0" max="180" value="0" step="1" />
+      </div>
+
+      <div class="ui-group">
+        <label>Tracking & Leading</label>
+        <div class="row-flex">
+          <input type="range" id="trackSlider" min="-50" max="150" value="10" step="1" title="Tracking" />
+          <input type="range" id="leadSlider" min="20" max="220" value="50" step="1" title="Leading" />
+        </div>
+      </div>
+
+      <div class="button-grid">
+        <button class="btn-mono" id="btnPng">PNG</button>
+        <button class="btn-mono" id="btnSvg">SVG</button>
+        <button class="btn-mono" id="btnOtf">OTF</button>
+        <button class="btn-mono" id="btnReset">Reset</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Specimen Inspector -->
+  <aside id="specimen-panel" class="hazy-glass">
+    <div class="panel-header">
+      <div>
+        <span class="panel-title">Glyph Specimen</span>
+        <div class="panel-subtitle" id="specimenCount">94 glyphs • Click to inspect</div>
+      </div>
+      <button id="toggleSpecimenBtn" class="panel-nav-btn" title="Minimize Panel">–</button>
+    </div>
+    <div id="specimen-grid"></div>
+  </aside>
+
+  <!-- Separate Movable Floating Single-View Window -->
+  <div id="glyph-focus-window" class="hazy-glass">
+    <div class="window-header" id="glyphWindowHeader">
+      <div class="window-title">
+        <span>GLYPH INSPECTION:</span>
+        <span id="focusGlyphChar" style="font-size: 16px; font-weight: 800;">A</span>
+        <span id="focusGlyphCode" style="color: var(--text-muted); font-size: 10px;">(U+0041)</span>
+      </div>
+      <div class="row-flex" style="gap: 4px;">
+        <button class="btn-mono" id="focusResetOverrideBtn" style="padding: 2px 6px; font-size: 9px;">RESET OVERRIDE</button>
+        <button class="panel-nav-btn" id="closeFocusBtn" title="Close Window">✕</button>
+      </div>
+    </div>
+
+    <div class="window-body">
+      <button class="focus-nav-btn" id="focusPrevBtn" title="Previous glyph (Left Arrow)">←</button>
+      <canvas id="focusPreviewCanvas" width="300" height="300"></canvas>
+      <button class="focus-nav-btn" id="focusNextBtn" title="Next glyph (Right Arrow)">→</button>
+    </div>
+
+    <div class="window-footer">
+      <span class="panel-subtitle">Drag header to reposition</span>
+      <span class="panel-subtitle">Arrow keys (← / →) navigate</span>
+    </div>
+  </div>
+
+  <!-- Canvas Logic -->
+  <script>
+    let isDark = true;
+    let customFont = null;
+    let fontLoaded = false;
+    let currentFontName = "Inter (System)";
+
+    let typedText = "MUTANT";
+    let currentShape = "ellipse";
+    let currentBlend = "normal";
+    let customIcon = null;
+    let customIconDataURL = "";
+    let customIconImg = null;
+
+    // 4x4 Bayer Matrix for Ordered Dithering
+    const bayerMatrix4x4 = [
+      [ 0/16,  8/16,  2/16, 10/16],
+      [12/16,  4/16, 14/16,  6/16],
+      [ 3/16, 11/16,  1/16,  9/16],
+      [15/16,  7/16, 13/16,  5/16]
+    ];
+
+    let globalParams = {
+      shapeW: 12,
+      shapeH: 12,
+      noiseAmt: 0,
+      gridSize: 6,
+      gScale: 1.0,
+      stretchX: 1.0,
+      stretchY: 1.0,
+      shapeRot: 0,
+      tracking: 10,
+      leading: 50,
+      fillEnabled: true,
+      fillColor: "#ffffff",
+      fillMode: "solid",
+      fillEffectIntensity: 0.5,
+      strokeEnabled: false,
+      strokeColor: "#000000",
+      strokeWeight: 1
+    };
+
+    let glyphOverrides = {};
+    let selectedGlyphChar = null;
+    let isFocusWindowOpen = false;
+
+    let glyphCache = {};
+    let glyphBuffer;
+    let lastGridSize = 6;
+    let specimenGlyphs = [];
+
+    let layoutBounds = {
+      contentLeft: 360,
+      contentRight: 800,
+      centerY: 400,
+      availableW: 440
+    };
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+
+      glyphBuffer = createGraphics(500, 500);
+      glyphBuffer.pixelDensity(1);
+
+      for (let i = 33; i <= 126; i++) {
+        specimenGlyphs.push(String.fromCharCode(i));
+      }
+
+      initDOM();
+      makeWindowDraggable();
+      rebuildSpecimenGrid();
+      updateLayoutBounds();
+    }
+
+    function getEffectiveParams(char) {
+      if (char && glyphOverrides[char]) {
+        return Object.assign({}, globalParams, glyphOverrides[char]);
+      }
+      return globalParams;
+    }
+
+    function initDOM() {
+      const themeBtn = document.getElementById("themeToggleBtn");
+      themeBtn.addEventListener("click", () => {
+        isDark = !isDark;
+        document.body.setAttribute("data-theme", isDark ? "dark" : "light");
+        themeBtn.textContent = isDark ? "☀️ LIGHT" : "🌙 DARK";
+
+        if (globalParams.fillColor === "#ffffff" && !isDark) {
+          globalParams.fillColor = "#000000";
+          document.getElementById("fillColorPicker").value = "#000000";
+        } else if (globalParams.fillColor === "#000000" && isDark) {
+          globalParams.fillColor = "#ffffff";
+          document.getElementById("fillColorPicker").value = "#ffffff";
+        }
+
+        updateFocusPreview();
+      });
+
+      // Multiline Input handler
+      const textIn = document.getElementById("textInput");
+      textIn.addEventListener("input", (e) => {
+        typedText = e.target.value;
+      });
+
+      document.getElementById("fontFilePicker").addEventListener("change", handleFontUpload);
+
+      const shapePicker = document.getElementById("shapePicker");
+      const iconWrapper = document.getElementById("iconPickerWrapper");
+      shapePicker.addEventListener("change", (e) => {
+        currentShape = e.target.value;
+        iconWrapper.style.display = currentShape === "image" ? "block" : "none";
+        updateFocusPreview();
+      });
+
+      document.getElementById("blendPicker").addEventListener("change", (e) => {
+        currentBlend = e.target.value;
+      });
+
+      document.getElementById("iconFilePicker").addEventListener("change", handleIconUpload);
+
+      document.getElementById("resetTargetBtn").addEventListener("click", () => {
+        deselectGlyph();
+      });
+
+      document.getElementById("btnOpenFocusWindow").addEventListener("click", () => {
+        openFocusWindow(selectedGlyphChar || specimenGlyphs[0]);
+      });
+
+      // Fill & Stroke Event Listeners
+      const fillCheck = document.getElementById("fillCheckbox");
+      fillCheck.addEventListener("change", (e) => {
+        applyParam("fillEnabled", e.target.checked);
+      });
+
+      const fillColor = document.getElementById("fillColorPicker");
+      fillColor.addEventListener("input", (e) => {
+        applyParam("fillColor", e.target.value);
+      });
+
+      // Fill Mode (Solid / Dither / Noise)
+      const fillModeSelect = document.getElementById("fillModePicker");
+      const effectGroup = document.getElementById("fillEffectGroup");
+      const effectLabel = document.getElementById("fillEffectLabel");
+
+      fillModeSelect.addEventListener("change", (e) => {
+        const mode = e.target.value;
+        applyParam("fillMode", mode);
+        if (mode === "solid") {
+          effectGroup.style.display = "none";
+        } else {
+          effectGroup.style.display = "block";
+          effectLabel.textContent = mode === "dither" ? "Dither Threshold" : "Noise Dissolve";
+        }
+      });
+
+      bindSlider("fillEffectSlider", "fillEffectBadge", (v) => applyParam("fillEffectIntensity", parseFloat(v)), "%", (v) => Math.round(v * 100));
+
+      const strokeCheck = document.getElementById("strokeCheckbox");
+      strokeCheck.addEventListener("change", (e) => {
+        applyParam("strokeEnabled", e.target.checked);
+      });
+
+      const strokeColor = document.getElementById("strokeColorPicker");
+      strokeColor.addEventListener("input", (e) => {
+        applyParam("strokeColor", e.target.value);
+      });
+
+      bindSlider("strokeWeightSlider", "strokeWeightBadge", (v) => applyParam("strokeWeight", parseFloat(v)), "px");
+
+      // Minimize / Toggle Panel handlers
+      const sidebar = document.getElementById("sidebar-controls");
+      const toggleControlsBtn = document.getElementById("toggleControlsBtn");
+      toggleControlsBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("minimized");
+        toggleControlsBtn.textContent = sidebar.classList.contains("minimized") ? "+" : "–";
+        updateLayoutBounds();
+      });
+
+      const specimenPanel = document.getElementById("specimen-panel");
+      const toggleSpecimenBtn = document.getElementById("toggleSpecimenBtn");
+      toggleSpecimenBtn.addEventListener("click", () => {
+        specimenPanel.classList.toggle("minimized");
+        toggleSpecimenBtn.textContent = specimenPanel.classList.contains("minimized") ? "+" : "–";
+        updateLayoutBounds();
+      });
+
+      document.getElementById("closeFocusBtn").addEventListener("click", closeFocusWindow);
+      document.getElementById("focusPrevBtn").addEventListener("click", () => navigateFocusGlyph(-1));
+      document.getElementById("focusNextBtn").addEventListener("click", () => navigateFocusGlyph(1));
+
+      document.getElementById("focusResetOverrideBtn").addEventListener("click", () => {
+        if (selectedGlyphChar && glyphOverrides[selectedGlyphChar]) {
+          delete glyphOverrides[selectedGlyphChar];
+          syncSlidersToParams(globalParams);
+          updateFocusPreview();
+        }
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (!isFocusWindowOpen) return;
+        if (e.key === "ArrowLeft") {
+          navigateFocusGlyph(-1);
+        } else if (e.key === "ArrowRight") {
+          navigateFocusGlyph(1);
+        } else if (e.key === "Escape") {
+          closeFocusWindow();
+        }
+      });
+
+      bindSlider("wSlider", "wBadge", (v) => applyParam("shapeW", parseFloat(v)));
+      bindSlider("hSlider", "hBadge", (v) => applyParam("shapeH", parseFloat(v)));
+      bindSlider("noiseSlider", "noiseBadge", (v) => applyParam("noiseAmt", parseFloat(v)));
+      bindSlider("gridSlider", "gridBadge", (v) => applyParam("gridSize", parseInt(v)));
+      bindSlider("scaleSlider", "scaleBadge", (v) => applyParam("gScale", parseFloat(v)));
+      bindSlider("stretchXSlider", null, (v) => applyParam("stretchX", parseFloat(v)));
+      bindSlider("stretchYSlider", null, (v) => applyParam("stretchY", parseFloat(v)));
+      bindSlider("rotSlider", "rotBadge", (v) => applyParam("shapeRot", parseFloat(v)), "°");
+      bindSlider("trackSlider", null, (v) => applyParam("tracking", parseFloat(v)));
+      bindSlider("leadSlider", null, (v) => applyParam("leading", parseFloat(v)));
+
+      document.getElementById("btnPng").addEventListener("click", exportPNG);
+      document.getElementById("btnSvg").addEventListener("click", exportSVG);
+      document.getElementById("btnOtf").addEventListener("click", exportOTF);
+      document.getElementById("btnReset").addEventListener("click", resetParameters);
+    }
+
+    function makeWindowDraggable() {
+      const win = document.getElementById("glyph-focus-window");
+      const header = document.getElementById("glyphWindowHeader");
+      let isDragging = false;
+      let startX, startY, origX, origY;
+
+      header.addEventListener("mousedown", (e) => {
+        if (e.target.tagName === "BUTTON") return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = win.getBoundingClientRect();
+        origX = rect.left;
+        origY = rect.top;
+        win.style.transform = "none";
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        win.style.left = `${Math.max(10, Math.min(window.innerWidth - win.offsetWidth - 10, origX + dx))}px`;
+        win.style.top = `${Math.max(10, Math.min(window.innerHeight - win.offsetHeight - 10, origY + dy))}px`;
+      });
+
+      window.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+    }
+
+    function applyParam(key, value) {
+      if (selectedGlyphChar) {
+        if (!glyphOverrides[selectedGlyphChar]) {
+          glyphOverrides[selectedGlyphChar] = Object.assign({}, globalParams);
+        }
+        glyphOverrides[selectedGlyphChar][key] = value;
+      } else {
+        globalParams[key] = value;
+      }
+      if (isFocusWindowOpen) {
+        updateFocusPreview();
+      }
+    }
+
+    function bindSlider(id, badgeId, onChange, suffix = "", transform = null) {
+      const el = document.getElementById(id);
+      const badge = badgeId ? document.getElementById(badgeId) : null;
+      el.addEventListener("input", (e) => {
+        const val = e.target.value;
+        if (badge) badge.textContent = (transform ? transform(val) : val) + suffix;
+        onChange(val);
+      });
+    }
+
+    function selectGlyph(char, openWindow = true) {
+      selectedGlyphChar = char;
+      const targetText = document.getElementById("targetBadgeText");
+      const resetBtn = document.getElementById("resetTargetBtn");
+
+      targetText.textContent = `OVERRIDE: [ ${char} ]`;
+      resetBtn.style.display = "block";
+
+      const params = getEffectiveParams(char);
+      syncSlidersToParams(params);
+
+      document.querySelectorAll(".specimen-card").forEach(c => {
+        c.classList.toggle("selected-glyph", c.dataset.char === char);
+      });
+
+      if (openWindow) {
+        openFocusWindow(char);
+      }
+    }
+
+    function deselectGlyph() {
+      selectedGlyphChar = null;
+      document.getElementById("targetBadgeText").textContent = "TARGET: ALL GLYPHS";
+      document.getElementById("resetTargetBtn").style.display = "none";
+      syncSlidersToParams(globalParams);
+
+      document.querySelectorAll(".specimen-card").forEach(c => {
+        c.classList.remove("selected-glyph");
+      });
+    }
+
+    function openFocusWindow(char) {
+      isFocusWindowOpen = true;
+      selectedGlyphChar = char;
+      const win = document.getElementById("glyph-focus-window");
+      win.classList.add("active");
+
+      document.getElementById("focusGlyphChar").textContent = char;
+      document.getElementById("focusGlyphCode").textContent = `(U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")})`;
+
+      const targetText = document.getElementById("targetBadgeText");
+      const resetBtn = document.getElementById("resetTargetBtn");
+      targetText.textContent = `OVERRIDE: [ ${char} ]`;
+      resetBtn.style.display = "block";
+
+      syncSlidersToParams(getEffectiveParams(char));
+      document.querySelectorAll(".specimen-card").forEach(c => {
+        c.classList.toggle("selected-glyph", c.dataset.char === char);
+      });
+
+      updateFocusPreview();
+    }
+
+    function closeFocusWindow() {
+      isFocusWindowOpen = false;
+      document.getElementById("glyph-focus-window").classList.remove("active");
+    }
+
+    function navigateFocusGlyph(dir) {
+      let targetChar = selectedGlyphChar || specimenGlyphs[0];
+      let currentIndex = specimenGlyphs.indexOf(targetChar);
+      if (currentIndex === -1) currentIndex = 0;
+
+      let nextIndex = (currentIndex + dir + specimenGlyphs.length) % specimenGlyphs.length;
+      const nextChar = specimenGlyphs[nextIndex];
+      selectGlyph(nextChar, true);
+    }
+
+    function shouldFillPoint(ptIndex, x, y, p) {
+      if (!p.fillEnabled) return false;
+      if (p.fillMode === "solid") return true;
+
+      if (p.fillMode === "dither") {
+        const step = Math.max(1, p.gridSize || 6);
+        const bx = Math.abs(Math.floor(x / step)) % 4;
+        const by = Math.abs(Math.floor(y / step)) % 4;
+        return bayerMatrix4x4[by][bx] < p.fillEffectIntensity;
+      }
+
+      if (p.fillMode === "noise") {
+        const n = noise(x * 0.05, y * 0.05, ptIndex * 0.02);
+        return n < p.fillEffectIntensity;
+      }
+
+      return true;
+    }
+
+    function updateFocusPreview() {
+      if (!isFocusWindowOpen || !selectedGlyphChar) return;
+
+      const canvas = document.getElementById("focusPreviewCanvas");
+      const ctx = canvas.getContext("2d");
+      const char = selectedGlyphChar;
+      const p = getEffectiveParams(char);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const g = getGlyph(char, p.gridSize);
+      if (!g) return;
+
+      const rad = (p.shapeRot * Math.PI) / 180;
+      const focusScale = 1.0;
+      const effScaleX = focusScale * p.gScale * p.stretchX;
+      const effScaleY = focusScale * p.gScale * p.stretchY;
+
+      const drawX = (canvas.width - g.advance * effScaleX) / 2;
+      const drawY = canvas.height / 2 + 70;
+
+      ctx.save();
+      ctx.translate(drawX, drawY);
+      ctx.scale(effScaleX, effScaleY);
+
+      ctx.fillStyle = p.fillColor;
+      ctx.strokeStyle = p.strokeColor;
+      ctx.lineWidth = p.strokeWeight;
+
+      for (let i = 0; i < g.points.length; i++) {
+        const pt = g.points[i];
+        const jit = getJitter(pt.x, pt.y, p.noiseAmt);
+        const drawFill = shouldFillPoint(i, pt.x, pt.y, p);
+
+        ctx.save();
+        ctx.translate(pt.x + jit.dx, pt.y + jit.dy);
+        ctx.rotate(rad);
+
+        if (currentShape === "square") {
+          if (drawFill) ctx.fillRect(-p.shapeW / 2, -p.shapeH / 2, p.shapeW, p.shapeH);
+          if (p.strokeEnabled) ctx.strokeRect(-p.shapeW / 2, -p.shapeH / 2, p.shapeW, p.shapeH);
+        } else if (currentShape === "image" && customIconImg && customIconImg.complete) {
+          if (drawFill) ctx.drawImage(customIconImg, -p.shapeW / 2, -p.shapeH / 2, p.shapeW, p.shapeH);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.shapeW / 2, 0, Math.PI * 2);
+          if (drawFill) ctx.fill();
+          if (p.strokeEnabled) ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    function syncSlidersToParams(p) {
+      document.getElementById("wSlider").value = p.shapeW;
+      document.getElementById("hSlider").value = p.shapeH;
+      document.getElementById("noiseSlider").value = p.noiseAmt;
+      document.getElementById("gridSlider").value = p.gridSize;
+      document.getElementById("scaleSlider").value = p.gScale;
+      document.getElementById("stretchXSlider").value = p.stretchX;
+      document.getElementById("stretchYSlider").value = p.stretchY;
+      document.getElementById("rotSlider").value = p.shapeRot;
+      document.getElementById("trackSlider").value = p.tracking;
+      document.getElementById("leadSlider").value = p.leading;
+
+      document.getElementById("fillCheckbox").checked = p.fillEnabled;
+      document.getElementById("fillColorPicker").value = p.fillColor;
+      document.getElementById("fillModePicker").value = p.fillMode || "solid";
+      document.getElementById("fillEffectSlider").value = p.fillEffectIntensity !== undefined ? p.fillEffectIntensity : 0.5;
+
+      const effectGroup = document.getElementById("fillEffectGroup");
+      const effectLabel = document.getElementById("fillEffectLabel");
+      if (p.fillMode && p.fillMode !== "solid") {
+        effectGroup.style.display = "block";
+        effectLabel.textContent = p.fillMode === "dither" ? "Dither Threshold" : "Noise Dissolve";
+      } else {
+        effectGroup.style.display = "none";
+      }
+
+      document.getElementById("strokeCheckbox").checked = p.strokeEnabled;
+      document.getElementById("strokeColorPicker").value = p.strokeColor;
+      document.getElementById("strokeWeightSlider").value = p.strokeWeight;
+
+      document.getElementById("wBadge").textContent = p.shapeW;
+      document.getElementById("hBadge").textContent = p.shapeH;
+      document.getElementById("noiseBadge").textContent = p.noiseAmt;
+      document.getElementById("gridBadge").textContent = p.gridSize;
+      document.getElementById("scaleBadge").textContent = p.gScale;
+      document.getElementById("rotBadge").textContent = p.shapeRot + "°";
+      document.getElementById("strokeWeightBadge").textContent = p.strokeWeight + "px";
+      document.getElementById("fillEffectBadge").textContent = Math.round((p.fillEffectIntensity !== undefined ? p.fillEffectIntensity : 0.5) * 100) + "%";
+    }
+
+    function rebuildSpecimenGrid() {
+      const grid = document.getElementById("specimen-grid");
+      grid.innerHTML = "";
+      document.getElementById("specimenCount").textContent = `${specimenGlyphs.length} glyphs • Click to inspect`;
+
+      for (const char of specimenGlyphs) {
+        const card = document.createElement("div");
+        card.className = "specimen-card";
+        card.dataset.char = char;
+
+        const label = document.createElement("div");
+        label.className = "card-char";
+        label.textContent = char;
+
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.width = 50;
+        previewCanvas.height = 36;
+        previewCanvas.className = "card-preview";
+
+        card.appendChild(label);
+        card.appendChild(previewCanvas);
+
+        card.addEventListener("click", () => {
+          selectGlyph(char, true);
+        });
+
+        grid.appendChild(card);
+      }
+    }
+
+    function updateSpecimenThumbnails() {
+      const cards = document.querySelectorAll(".specimen-card");
+
+      cards.forEach((card, i) => {
+        const char = specimenGlyphs[i];
+        const canvas = card.querySelector(".card-preview");
+        if (!canvas) return;
+
+        const p = getEffectiveParams(char);
+        const effScaleX = 0.22 * p.stretchX;
+        const effScaleY = 0.22 * p.stretchY;
+        const rad = (p.shapeRot * Math.PI) / 180;
+
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const g = getGlyph(char, p.gridSize);
+        if (!g) return;
+
+        const drawX = (canvas.width - g.advance * effScaleX) / 2;
+        const drawY = canvas.height - 8;
+
+        ctx.save();
+        ctx.translate(drawX, drawY);
+        ctx.scale(effScaleX, effScaleY);
+
+        ctx.fillStyle = p.fillColor;
+        ctx.strokeStyle = p.strokeColor;
+        ctx.lineWidth = Math.max(0.7, p.strokeWeight * 0.3);
+
+        for (let j = 0; j < g.points.length; j++) {
+          const pt = g.points[j];
+          const drawFill = shouldFillPoint(j, pt.x, pt.y, p);
+
+          ctx.save();
+          ctx.translate(pt.x, pt.y);
+          ctx.rotate(rad);
+
+          if (currentShape === "square") {
+            if (drawFill) ctx.fillRect(-p.shapeW / 2, -p.shapeH / 2, p.shapeW, p.shapeH);
+            if (p.strokeEnabled) ctx.strokeRect(-p.shapeW / 2, -p.shapeH / 2, p.shapeW, p.shapeH);
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.shapeW / 2, 0, Math.PI * 2);
+            if (drawFill) ctx.fill();
+            if (p.strokeEnabled) ctx.stroke();
+          }
+          ctx.restore();
+        }
+        ctx.restore();
+      });
+    }
+
+    function handleFontUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const parsed = opentype.parse(evt.target.result);
+
+          let name = file.name.replace(/\.[^/.]+$/, "");
+          if (parsed.names && parsed.names.fontFamily) {
+            name = parsed.names.fontFamily.en || Object.values(parsed.names.fontFamily)[0];
+          }
+
+          currentFontName = name;
+          document.getElementById("fontBadge").textContent = currentFontName;
+
+          const p5F = new p5.Font(this);
+          p5F.font = parsed;
+          customFont = p5F;
+          fontLoaded = true;
+
+          const fontChars = [];
+          if (parsed.glyphs && parsed.glyphs.glyphs) {
+            for (let k in parsed.glyphs.glyphs) {
+              const u = parsed.glyphs.glyphs[k].unicode;
+              if (u >= 32 && u <= 126) fontChars.push(String.fromCharCode(u));
+            }
+          }
+          if (fontChars.length > 20) {
+            specimenGlyphs = Array.from(new Set(fontChars)).sort();
+            rebuildSpecimenGrid();
+          }
+
+          glyphCache = {};
+          if (isFocusWindowOpen) updateFocusPreview();
+        } catch (err) {
+          console.error("Font parse failure:", err);
+          alert("Could not load font file.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function handleIconUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        customIconDataURL = evt.target.result;
+        customIcon = loadImage(customIconDataURL);
+        customIconImg = new Image();
+        customIconImg.onload = () => {
+          if (isFocusWindowOpen) updateFocusPreview();
+        };
+        customIconImg.src = customIconDataURL;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function draw() {
+      background(isDark ? 5 : 245);
+
+      if (globalParams.gridSize !== lastGridSize) {
+        glyphCache = {};
+        lastGridSize = globalParams.gridSize;
+      }
+
+      updateLayoutBounds();
+      drawCenteredTypography();
+
+      if (frameCount % 8 === 0) {
+        updateSpecimenThumbnails();
+      }
+    }
+
+    function updateLayoutBounds() {
+      const sidebar = document.getElementById("sidebar-controls");
+      const specimen = document.getElementById("specimen-panel");
+
+      const sidebarW = (sidebar && sidebar.classList.contains("minimized")) ? 70 : 340;
+      const panelW = (specimen && specimen.classList.contains("minimized")) ? 70 : 400;
+
+      layoutBounds = {
+        contentLeft: sidebarW + 20,
+        contentRight: width - panelW - 20,
+        centerY: height / 2,
+        availableW: Math.max(100, (width - panelW - 20) - (sidebarW + 20))
+      };
+    }
+
+    function drawCenteredTypography() {
+      // Splits text by new lines
+      const rawLines = typedText.split("\n");
+      const lines = rawLines.length > 0 ? rawLines : [""];
+
+      let maxLineWidth = 0;
+      const lineWidths = lines.map(line => {
+        let w = 0;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const p = getEffectiveParams(char);
+          const effScaleX = p.gScale * p.stretchX;
+
+          if (char === " ") {
+            w += getTextAdvance(" ", 220) * effScaleX + p.tracking;
+          } else {
+            const g = getGlyph(char, p.gridSize);
+            w += (g ? g.advance : 100) * effScaleX + p.tracking;
+          }
+        }
+        if (w > maxLineWidth) maxLineWidth = w;
+        return w;
+      });
+
+      const effectiveLeading = (globalParams.leading * 3) * globalParams.stretchY * globalParams.gScale;
+      const totalHeight = (lines.length - 1) * effectiveLeading;
+      let curY = layoutBounds.centerY - (totalHeight / 2);
+
+      for (let r = 0; r < lines.length; r++) {
+        const line = lines[r];
+        const lineWidth = lineWidths[r];
+        let curX = layoutBounds.contentLeft + (layoutBounds.availableW / 2) - (lineWidth / 2);
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const p = getEffectiveParams(char);
+          const effScaleX = p.gScale * p.stretchX;
+          const effScaleY = p.gScale * p.stretchY;
+
+          if (char === " ") {
+            curX += getTextAdvance(" ", 220) * effScaleX + p.tracking;
+            continue;
+          }
+
+          const glyph = getGlyph(char, p.gridSize);
+          if (glyph) {
+            drawGlyphShape(glyph, curX, curY, effScaleX, effScaleY, p);
+            curX += glyph.advance * effScaleX + p.tracking;
+          }
+        }
+        curY += effectiveLeading;
+      }
+    }
+
+    function drawGlyphShape(glyph, posX, posY, sX, sY, p) {
+      push();
+      translate(posX, posY);
+      scale(sX, sY);
+
+      const rad = radians(p.shapeRot);
+
+      if (p.strokeEnabled) {
+        stroke(p.strokeColor);
+        strokeWeight(p.strokeWeight);
+      } else {
+        noStroke();
+      }
+
+      if (currentBlend === "overlap") {
+        blendMode(isDark ? SCREEN : MULTIPLY);
+      } else if (currentBlend === "exclude") {
+        drawingContext.globalCompositeOperation = "xor";
+      } else {
+        blendMode(BLEND);
+      }
+
+      for (let i = 0; i < glyph.points.length; i++) {
+        const pt = glyph.points[i];
+        const jit = getJitter(pt.x, pt.y, p.noiseAmt);
+        const drawFill = shouldFillPoint(i, pt.x, pt.y, p);
+
+        if (drawFill) {
+          fill(p.fillColor);
+        } else {
+          noFill();
+        }
+
+        if (!drawFill && !p.strokeEnabled) continue;
+
+        push();
+        translate(pt.x + jit.dx, pt.y + jit.dy);
+        rotate(rad);
+
+        if (currentShape === "square") {
+          rectMode(CENTER);
+          rect(0, 0, p.shapeW, p.shapeH);
+        } else if (currentShape === "image" && customIcon) {
+          if (drawFill) {
+            imageMode(CENTER);
+            image(customIcon, 0, 0, p.shapeW, p.shapeH);
+          }
+        } else {
+          ellipse(0, 0, p.shapeW, p.shapeH);
+        }
+
+        pop();
+      }
+
+      pop();
+      blendMode(BLEND);
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      updateLayoutBounds();
+    }
+
+    function getTextAdvance(char, size) {
+      push();
+      if (customFont) textFont(customFont);
+      textSize(size);
+      const w = textWidth(char);
+      pop();
+      return w;
+    }
+
+    function getGlyph(char, stepSize) {
+      const key = `${char}_${stepSize || 6}`;
+      if (glyphCache[key]) return glyphCache[key];
+      const g = sampleGlyph(char, stepSize || 6);
+      glyphCache[key] = g;
+      return g;
+    }
+
+    function sampleGlyph(char, step) {
+      const renderSize = 220;
+      const padding = 50;
+
+      glyphBuffer.clear();
+      glyphBuffer.background(255);
+      glyphBuffer.noStroke();
+      glyphBuffer.fill(0);
+      if (customFont) glyphBuffer.textFont(customFont);
+      glyphBuffer.textSize(renderSize);
+      glyphBuffer.textAlign(LEFT, BASELINE);
+
+      let bounds;
+      try {
+        if (customFont && customFont.textBounds) {
+          bounds = customFont.textBounds(char, 0, 0, renderSize);
+        } else {
+          bounds = { x: 0, y: -renderSize * 0.8, w: textWidth(char), h: renderSize * 0.8 };
+        }
+      } catch (e) {
+        bounds = { x: 0, y: -renderSize, w: renderSize, h: renderSize };
+      }
+
+      const originX = padding - bounds.x;
+      const originY = padding - bounds.y;
+
+      glyphBuffer.text(char, originX, originY);
+      glyphBuffer.loadPixels();
+
+      const advance = getTextAdvance(char, renderSize);
+      const points = [];
+
+      const left = Math.max(0, Math.floor(padding));
+      const top = Math.max(0, Math.floor(padding));
+      const right = Math.min(glyphBuffer.width, Math.ceil(padding + bounds.w));
+      const bottom = Math.min(glyphBuffer.height, Math.ceil(padding + bounds.h));
+
+      for (let y = top; y < bottom; y += step) {
+        for (let x = left; x < right; x += step) {
+          const idx = 4 * (y * glyphBuffer.width + x);
+          const r = glyphBuffer.pixels[idx];
+          const g = glyphBuffer.pixels[idx + 1];
+          const b = glyphBuffer.pixels[idx + 2];
+          const alpha = glyphBuffer.pixels[idx + 3];
+          const brightness = (r + g + b) / 3;
+
+          if (alpha > 30 && brightness < 128) {
+            points.push({ x: x - originX, y: y - originY });
+          }
+        }
+      }
+
+      return { points, advance, bounds };
+    }
+
+    function getJitter(x, y, amount) {
+      if (amount <= 0 || currentShape === "image") return { dx: 0, dy: 0 };
+      const freq = 0.05;
+      const nx = (noise(x * freq, y * freq) - 0.5) * 2 * amount;
+      const ny = (noise((x + 500) * freq, (y + 500) * freq) - 0.5) * 2 * amount;
+      return { dx: nx, dy: ny };
+    }
+
+    function exportPNG() {
+      const slug = currentFontName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+      saveCanvas(`mutant-type-lab-${slug}`, "png");
+    }
+
+    function exportSVG() {
+      const w = windowWidth;
+      const h = windowHeight;
+      const bgColor = isDark ? "#050505" : "#f5f5f5";
+
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">\n`;
+      svg += `<rect width="100%" height="100%" fill="${bgColor}"/>\n`;
+
+      const groupAttr = currentBlend === "exclude"
+        ? `fill-rule="evenodd"`
+        : (currentBlend === "overlap"
+          ? `style="mix-blend-mode: ${isDark ? "screen" : "multiply"}; opacity: 0.75;"`
+          : "");
+
+      svg += `<g ${groupAttr}>\n`;
+
+      const lines = typedText.split("\n");
+      const lineWidths = lines.map(line => {
+        let lw = 0;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const p = getEffectiveParams(char);
+          const effScaleX = p.gScale * p.stretchX;
+          lw += (char === " " ? getTextAdvance(" ", 220) : (getGlyph(char, p.gridSize)?.advance || 100)) * effScaleX + p.tracking;
+        }
+        return lw;
+      });
+
+      const effectiveLeading = (globalParams.leading * 3) * globalParams.stretchY * globalParams.gScale;
+      const totalHeight = (lines.length - 1) * effectiveLeading;
+      let curY = layoutBounds.centerY - (totalHeight / 2);
+
+      for (let r = 0; r < lines.length; r++) {
+        const line = lines[r];
+        let curX = layoutBounds.contentLeft + (layoutBounds.availableW / 2) - (lineWidths[r] / 2);
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const p = getEffectiveParams(char);
+          const effScaleX = p.gScale * p.stretchX;
+          const effScaleY = p.gScale * p.stretchY;
+
+          if (char === " ") {
+            curX += getTextAdvance(" ", 220) * effScaleX + p.tracking;
+            continue;
+          }
+
+          const g = getGlyph(char, p.gridSize);
+          if (g) {
+            for (let ptIdx = 0; ptIdx < g.points.length; ptIdx++) {
+              const pt = g.points[ptIdx];
+              const drawFill = shouldFillPoint(ptIdx, pt.x, pt.y, p);
+              if (!drawFill && !p.strokeEnabled) continue;
+
+              const fillAttr = drawFill ? `fill="${p.fillColor}"` : `fill="none"`;
+              const strokeAttr = p.strokeEnabled ? `stroke="${p.strokeColor}" stroke-width="${p.strokeWeight}"` : `stroke="none"`;
+
+              const jit = getJitter(pt.x, pt.y, p.noiseAmt);
+              const px = curX + (pt.x + jit.dx) * effScaleX;
+              const py = curY + (pt.y + jit.dy) * effScaleY;
+
+              if (currentShape === "square") {
+                svg += `<rect x="${px - p.shapeW/2}" y="${py - p.shapeH/2}" width="${p.shapeW}" height="${p.shapeH}" ${fillAttr} ${strokeAttr} transform="rotate(${p.shapeRot} ${px} ${py})"/>\n`;
+              } else if (currentShape === "image" && customIconDataURL) {
+                if (drawFill) {
+                  svg += `<image href="${customIconDataURL}" x="${px - p.shapeW/2}" y="${py - p.shapeH/2}" width="${p.shapeW}" height="${p.shapeH}" transform="rotate(${p.shapeRot} ${px} ${py})"/>\n`;
+                }
+              } else {
+                svg += `<ellipse cx="${px}" cy="${py}" rx="${p.shapeW/2}" ry="${p.shapeH/2}" ${fillAttr} ${strokeAttr} transform="rotate(${p.shapeRot} ${px} ${py})"/>\n`;
+              }
+            }
+            curX += g.advance * effScaleX + p.tracking;
+          }
+        }
+        curY += effectiveLeading;
+      }
+
+      svg += `</g>\n</svg>`;
+      downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `mutant-type-lab-${currentFontName}.svg`);
+    }
+
+    function exportOTF() {
+      if (typeof opentype === "undefined" || !customFont) {
+        alert("Please upload an OTF/TTF font to export vector typography.");
+        return;
+      }
+
+      const unitsPerEm = 1000;
+      const renderSize = 220;
+      const fontScale = unitsPerEm / renderSize;
+      const glyphs = [];
+
+      const notdef = new opentype.Path();
+      notdef.moveTo(100, -100);
+      notdef.lineTo(900, -100);
+      notdef.lineTo(900, 800);
+      notdef.lineTo(100, 800);
+      notdef.close();
+      glyphs.push(new opentype.Glyph({ name: ".notdef", unicode: 0, advanceWidth: unitsPerEm, path: notdef }));
+
+      const charset = new Set();
+      for (let c = 32; c <= 126; c++) charset.add(String.fromCharCode(c));
+      for (const c of typedText) if (c !== "\n") charset.add(c);
+
+      for (const char of charset) {
+        const p = getEffectiveParams(char);
+        const code = char.codePointAt(0);
+
+        if (char === " ") {
+          const adv = (getTextAdvance(" ", renderSize) * p.gScale * p.stretchX + p.tracking) * fontScale;
+          glyphs.push(new opentype.Glyph({ name: "space", unicode: 32, advanceWidth: adv, path: new opentype.Path() }));
+          continue;
+        }
+
+        const g = getGlyph(char, p.gridSize);
+        if (!g) continue;
+
+        const path = new opentype.Path();
+        const rad = radians(p.shapeRot);
+
+        for (let ptIdx = 0; ptIdx < g.points.length; ptIdx++) {
+          const pt = g.points[ptIdx];
+          if (!shouldFillPoint(ptIdx, pt.x, pt.y, p)) continue;
+
+          const jit = getJitter(pt.x, pt.y, p.noiseAmt);
+          const cx = (pt.x + jit.dx) * p.gScale * p.stretchX * fontScale;
+          const cy = -(pt.y + jit.dy) * p.gScale * p.stretchY * fontScale;
+          const halfW = (p.shapeW / 2) * fontScale;
+          const halfH = (p.shapeH / 2) * fontScale;
+
+          if (currentShape === "square" || currentShape === "image") {
+            addVectorRect(path, cx, cy, halfW, halfH, rad);
+          } else {
+            addBezierEllipse(path, cx, cy, halfW, halfH, rad);
+          }
+        }
+
+        const advW = (g.advance * p.gScale * p.stretchX + p.tracking) * fontScale;
+        glyphs.push(new opentype.Glyph({
+          name: `uni${code.toString(16).padStart(4, "0")}`,
+          unicode: code,
+          advanceWidth: Math.max(50, advW),
+          path: path
+        }));
+      }
+
+      const font = new opentype.Font({
+        familyName: `Mutant Type Lab - ${currentFontName}`,
+        styleName: "Regular",
+        unitsPerEm: unitsPerEm,
+        ascender: 800,
+        descender: -200,
+        glyphs: glyphs
+      });
+
+      downloadBlob(new Blob([font.toArrayBuffer()], { type: "font/otf" }), `mutant-type-lab-${currentFontName}.otf`);
+    }
+
+    function addBezierEllipse(path, cx, cy, rx, ry, angle) {
+      const k = 0.552284749831;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const tr = (x, y) => ({ x: cx + (x * cosA - y * sinA), y: cy + (x * sinA + y * cosA) });
+
+      const p0 = tr(rx, 0), p1 = tr(0, ry), p2 = tr(-rx, 0), p3 = tr(0, -ry);
+      const c0a = tr(rx, k * ry), c0b = tr(k * rx, ry);
+      const c1a = tr(-k * rx, ry), c1b = tr(-rx, k * ry);
+      const c2a = tr(-rx, -k * ry), c2b = tr(-k * rx, -ry);
+      const c3a = tr(k * rx, -ry), c3b = tr(rx, -k * ry);
+
+      path.moveTo(p0.x, p0.y);
+      path.bezierCurveTo(c0a.x, c0a.y, c0b.x, c0b.y, p1.x, p1.y);
+      path.bezierCurveTo(c1a.x, c1a.y, c1b.x, c1b.y, p2.x, p2.y);
+      path.bezierCurveTo(c2a.x, c2a.y, c2b.x, c2b.y, p3.x, p3.y);
+      path.bezierCurveTo(c3a.x, c3a.y, c3b.x, c3b.y, p0.x, p0.y);
+      path.close();
+    }
+
+    function addVectorRect(path, cx, cy, halfW, halfH, angle) {
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const tr = (x, y) => ({ x: cx + (x * cosA - y * sinA), y: cy + (x * sinA + y * cosA) });
+
+      const p1 = tr(-halfW, -halfH);
+      const p2 = tr(halfW, -halfH);
+      const p3 = tr(halfW, halfH);
+      const p4 = tr(-halfW, halfH);
+
+      path.moveTo(p1.x, p1.y);
+      path.lineTo(p2.x, p2.y);
+      path.lineTo(p3.x, p3.y);
+      path.lineTo(p4.x, p4.y);
+      path.close();
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function resetParameters() {
+      globalParams = {
+        shapeW: 12, shapeH: 12, noiseAmt: 0, gridSize: 6,
+        gScale: 1.0, stretchX: 1.0, stretchY: 1.0, shapeRot: 0,
+        tracking: 10, leading: 50,
+        fillEnabled: true,
+        fillColor: isDark ? "#ffffff" : "#000000",
+        fillMode: "solid",
+        fillEffectIntensity: 0.5,
+        strokeEnabled: false,
+        strokeColor: isDark ? "#000000" : "#ffffff",
+        strokeWeight: 1
+      };
+      glyphOverrides = {};
+      deselectGlyph();
+      currentShape = "ellipse";
+      currentBlend = "normal";
+      document.getElementById("shapePicker").value = "ellipse";
+      document.getElementById("blendPicker").value = "normal";
+      document.getElementById("iconPickerWrapper").style.display = "none";
+      glyphCache = {};
+      updateFocusPreview();
+    }
+  </script>
+</body>
+</html>
